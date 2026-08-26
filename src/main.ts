@@ -1,181 +1,13 @@
 import './styles/global.css'
 import Lenis from 'lenis'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import {initMenus} from './menu'
 
-gsap.registerPlugin(ScrollTrigger)
-
-const HERO_BACKGROUNDS = [
-  '/hero-table-bw.png',
-  '/hero-sorbet.png',
-  '/hero-olives-wine.png',
-  '/hero-pasta-tray.png',
-  '/hero-table-pasta.png',
-  '/hero-fish.png',
-] as const
-
-const SLIDE_INTERVAL_MS = 5000
-const SLIDE_TRANSITION_MS = 900
-const SWIPE_THRESHOLD_PX = 48
-
-const prefersReducedMotion = window.matchMedia(
-  '(prefers-reduced-motion: reduce)',
-).matches
-
-function initHeroSlideshow() {
-  const root = document.querySelector<HTMLElement>('.hero__slideshow')
-  const hero = document.querySelector<HTMLElement>('.hero')
-  if (!root || !hero) return
-
-  const track = document.createElement('div')
-  track.className = 'hero__slideshow-track'
-
-  const realCount = HERO_BACKGROUNDS.length
-  const slideUrls: string[] = [...HERO_BACKGROUNDS]
-  if (!prefersReducedMotion && realCount > 1) {
-    slideUrls.push(HERO_BACKGROUNDS[0])
-  }
-
-  for (const src of slideUrls) {
-    const slide = document.createElement('div')
-    slide.className = 'hero__slide'
-    slide.style.backgroundImage = `url('${src}')`
-    track.appendChild(slide)
-  }
-
-  root.appendChild(track)
-
-  if (prefersReducedMotion || realCount < 2) return
-
-  let index = 0
-  let autoplayId = 0
-  let locked = false
-  let pointerStartX = 0
-  let pointerStartY = 0
-  let dragging = false
-
-  const setTransition = (on: boolean) => {
-    track.style.transition = on
-      ? `transform ${SLIDE_TRANSITION_MS}ms ease-in-out`
-      : 'none'
-  }
-
-  const applyTransform = () => {
-    track.style.transform = `translate3d(-${index * 100}%, 0, 0)`
-  }
-
-  const scheduleAutoplay = () => {
-    window.clearInterval(autoplayId)
-    autoplayId = window.setInterval(() => goNext(false), SLIDE_INTERVAL_MS)
-  }
-
-  const goNext = (fromUser: boolean) => {
-    if (locked) return
-    if (fromUser) scheduleAutoplay()
-    locked = true
-    index += 1
-    setTransition(true)
-    applyTransform()
-  }
-
-  const goPrev = (fromUser: boolean) => {
-    if (locked) return
-    if (fromUser) scheduleAutoplay()
-
-    if (index === 0) {
-      setTransition(false)
-      index = realCount
-      applyTransform()
-      requestAnimationFrame(() => {
-        index -= 1
-        setTransition(true)
-        applyTransform()
-        locked = true
-      })
-      return
-    }
-
-    locked = true
-    index -= 1
-    setTransition(true)
-    applyTransform()
-  }
-
-  track.addEventListener('transitionend', () => {
-    locked = false
-    if (index < realCount) return
-    setTransition(false)
-    index = 0
-    applyTransform()
-  })
-
-  root.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return
-    dragging = true
-    pointerStartX = e.clientX
-    pointerStartY = e.clientY
-    root.setPointerCapture(e.pointerId)
-    root.classList.add('is-dragging')
-  })
-
-  root.addEventListener('pointerup', (e) => {
-    if (!dragging) return
-    dragging = false
-    root.releasePointerCapture(e.pointerId)
-    root.classList.remove('is-dragging')
-
-    const dx = e.clientX - pointerStartX
-    const dy = e.clientY - pointerStartY
-    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return
-    if (Math.abs(dx) < Math.abs(dy)) return
-
-    if (dx < 0) goNext(true)
-    else goPrev(true)
-  })
-
-  root.addEventListener('pointercancel', () => {
-    dragging = false
-    root.classList.remove('is-dragging')
-  })
-
-  hero.addEventListener(
-    'wheel',
-    (e) => {
-      const absX = Math.abs(e.deltaX)
-      const absY = Math.abs(e.deltaY)
-      if (absX < 15 && absY < 15) return
-
-      if (absX >= absY) {
-        e.preventDefault()
-        if (e.deltaX > 0) goNext(true)
-        else goPrev(true)
-        return
-      }
-
-      if (e.shiftKey) {
-        e.preventDefault()
-        if (e.deltaY > 0) goNext(true)
-        else goPrev(true)
-      }
-    },
-    { passive: false },
-  )
-
-  root.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      goNext(true)
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      goPrev(true)
-    }
-  })
-
-  scheduleAutoplay()
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 function initSmoothScroll() {
-  if (prefersReducedMotion) return null
+  if (prefersReducedMotion()) return null
 
   const lenis = new Lenis({
     duration: 1.1,
@@ -183,12 +15,11 @@ function initSmoothScroll() {
     smoothWheel: true,
   })
 
-  lenis.on('scroll', ScrollTrigger.update)
-
-  gsap.ticker.add((time) => {
-    lenis.raf(time * 1000)
-  })
-  gsap.ticker.lagSmoothing(0)
+  const raf = (time: number) => {
+    lenis.raf(time)
+    requestAnimationFrame(raf)
+  }
+  requestAnimationFrame(raf)
 
   return lenis
 }
@@ -197,17 +28,26 @@ function initReveals() {
   const blocks = document.querySelectorAll<HTMLElement>('.reveal')
   if (!blocks.length) return
 
-  if (prefersReducedMotion) {
+  if (prefersReducedMotion()) {
     blocks.forEach((el) => el.classList.add('is-visible'))
     return
+  }
+
+  const reveal = (el: Element) => {
+    // Wait until opacity:0 has painted, so above-the-fold blocks still animate
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.classList.add('is-visible')
+      })
+    })
   }
 
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible')
           observer.unobserve(entry.target)
+          reveal(entry.target)
         }
       })
     },
@@ -217,41 +57,211 @@ function initReveals() {
   blocks.forEach((el) => observer.observe(el))
 }
 
-function initHeroScrollPush() {
-  if (prefersReducedMotion) return
+function initAnchorScroll(lenis: Lenis | null) {
+  const scrollToTarget = (target: HTMLElement, updateHash = true) => {
+    if (lenis) {
+      lenis.scrollTo(target, { offset: 0 })
+    } else {
+      target.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      })
+    }
+    if (updateHash && target.id) {
+      history.pushState(null, '', `#${target.id}`)
+    }
+  }
 
-  const hero = document.querySelector<HTMLElement>('.hero')
-  const menu = document.querySelector<HTMLElement>('.menu-section')
-  if (!hero || !menu) return
+  const scrollToTop = () => {
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: prefersReducedMotion() })
+    } else {
+      window.scrollTo({
+        top: 0,
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      })
+    }
+  }
 
-  ScrollTrigger.create({
-    trigger: hero,
-    start: 'top top',
-    endTrigger: menu,
-    end: 'top top',
-    pin: true,
-    pinSpacing: false,
-    invalidateOnRefresh: true,
+  document.addEventListener('click', (event) => {
+    const link = (event.target as Element | null)?.closest?.('a[href]')
+    if (!(link instanceof HTMLAnchorElement)) return
+
+    const href = link.getAttribute('href')
+    if (!href) return
+
+    // Footer logo / home link: on Startseite zurück nach oben
+    if (
+      link.classList.contains('footer-brand') &&
+      (href === '/' || href === '/index.html')
+    ) {
+      const path = window.location.pathname
+      if (path === '/' || path === '/index.html' || path.endsWith('/index.html')) {
+        event.preventDefault()
+        history.pushState(null, '', '/')
+        scrollToTop()
+        return
+      }
+    }
+
+    if (!href.startsWith('#') || href === '#') return
+
+    const target = document.querySelector(href)
+    if (!(target instanceof HTMLElement)) return
+
+    event.preventDefault()
+    scrollToTarget(target)
   })
 
-  gsap.to(hero, {
-    yPercent: -100,
-    ease: 'none',
-    scrollTrigger: {
-      trigger: menu,
-      start: 'top bottom',
-      end: 'top top',
-      scrub: true,
+  const hash = window.location.hash
+  if (hash && hash.length > 1) {
+    const target = document.querySelector(hash)
+    if (target instanceof HTMLElement) {
+      requestAnimationFrame(() => scrollToTarget(target, false))
+    }
+  }
+}
+
+function initCustomCursor() {
+  const finePointerMq = window.matchMedia('(pointer: fine)')
+  if (!finePointerMq.matches) return
+
+  // DOM cursor: 15px coral dot, snap follow. Always the dot — never a hand.
+  const cursor = document.createElement('div')
+  cursor.className = 'site-cursor'
+  cursor.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(cursor)
+  document.documentElement.classList.add('has-custom-cursor')
+
+  let visible = false
+
+  const show = () => {
+    if (visible) return
+    visible = true
+    cursor.classList.add('is-visible')
+  }
+
+  const hide = () => {
+    if (!visible) return
+    visible = false
+    cursor.classList.remove('is-visible')
+  }
+
+  const move = (clientX: number, clientY: number) => {
+    // Instant follow (zero lag)
+    cursor.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`
+    show()
+  }
+
+  window.addEventListener(
+    'pointermove',
+    (event) => {
+      if (event.pointerType !== 'mouse') return
+      move(event.clientX, event.clientY)
     },
+    { passive: true },
+  )
+
+  document.addEventListener('mouseenter', show)
+  document.addEventListener('mouseleave', hide)
+  window.addEventListener('blur', hide)
+
+  return () => {
+    cursor.remove()
+    document.documentElement.classList.remove('has-custom-cursor')
+  }
+}
+
+function initReserveToggle() {
+  document.querySelectorAll<HTMLDetailsElement>('details.reserve').forEach((el) => {
+    const panel = el.querySelector('.reserve__panel')
+    panel?.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('a')) return
+      el.open = false
+    })
   })
 }
 
-initHeroSlideshow()
-const lenis = initSmoothScroll()
-initReveals()
-initHeroScrollPush()
+function initMobileLoopSlideshow() {
+  const loops = document.querySelectorAll<HTMLElement>('.team-loop')
+  if (!loops.length) return
 
-if (lenis) {
-  ScrollTrigger.addEventListener('refresh', () => lenis.resize())
-  ScrollTrigger.refresh()
+  const mobileMq = window.matchMedia('(max-width: 720px)')
+  const reducedMq = window.matchMedia('(prefers-reduced-motion: reduce)')
+  const INTERVAL_MS = 1000
+
+  type LoopState = {
+    el: HTMLElement
+    images: HTMLImageElement[]
+    index: number
+    timer: ReturnType<typeof setInterval> | null
+  }
+
+  const states: LoopState[] = Array.from(loops)
+    .map((el) => {
+      const firstGroup = el.querySelector('.team-loop__group')
+      const images = firstGroup
+        ? Array.from(firstGroup.querySelectorAll<HTMLImageElement>('img'))
+        : []
+      return { el, images, index: 0, timer: null }
+    })
+    .filter((state) => state.images.length > 0)
+
+  if (!states.length) return
+
+  const clearTimer = (state: LoopState) => {
+    if (state.timer !== null) {
+      clearInterval(state.timer)
+      state.timer = null
+    }
+  }
+
+  const setActive = (state: LoopState, index: number) => {
+    state.index = index
+    state.images.forEach((img, i) => {
+      img.classList.toggle('is-active', i === index)
+    })
+  }
+
+  const teardown = (state: LoopState) => {
+    clearTimer(state)
+    state.el.classList.remove('is-slideshow')
+    state.images.forEach((img) => img.classList.remove('is-active'))
+    state.index = 0
+  }
+
+  const sync = () => {
+    const isMobile = mobileMq.matches
+    const reduced = reducedMq.matches
+
+    states.forEach((state) => {
+      clearTimer(state)
+
+      if (!isMobile) {
+        teardown(state)
+        return
+      }
+
+      state.el.classList.add('is-slideshow')
+      setActive(state, state.index % state.images.length)
+
+      if (reduced || state.images.length < 2) return
+
+      state.timer = setInterval(() => {
+        setActive(state, (state.index + 1) % state.images.length)
+      }, INTERVAL_MS)
+    })
+  }
+
+  sync()
+  mobileMq.addEventListener('change', sync)
+  reducedMq.addEventListener('change', sync)
 }
+
+const lenis = initSmoothScroll()
+void initMenus()
+initReveals()
+initAnchorScroll(lenis)
+initReserveToggle()
+initCustomCursor()
+initMobileLoopSlideshow()
