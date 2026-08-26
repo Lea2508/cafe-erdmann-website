@@ -404,6 +404,10 @@ body:not(:has(.page-hero)):has(.page-main--kontakt)
   object-position: 50% 42%;
 }
 
+.page-cross--backstube .page-cross__image {
+  object-position: 50% 42%;
+}
+
 .page-hero--backstube {
   --hero-pos-y: 50%;
 }
