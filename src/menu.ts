@@ -1,4 +1,4 @@
-import {createClient, type SanityClient} from '@sanity/client'
+import {escapeHtml, getSanityClient} from './sanity'
 
 export type RestaurantMenuDoc = {
   title?: string
@@ -26,29 +26,6 @@ export type BrunchMenuDoc = {
     note?: string
     price?: number
   }>
-}
-
-function getClient(): SanityClient | null {
-  const projectId = import.meta.env.VITE_SANITY_PROJECT_ID as string | undefined
-  const dataset = (import.meta.env.VITE_SANITY_DATASET as string | undefined) || 'production'
-  if (!projectId) return null
-
-  return createClient({
-    projectId,
-    dataset,
-    apiVersion: '2025-01-01',
-    // CDN is fine; published content usually updates within ~60s after Publish
-    useCdn: true,
-    perspective: 'published',
-  })
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
 }
 
 function renderRestaurant(doc: RestaurantMenuDoc): string {
@@ -139,7 +116,7 @@ function renderBrunch(doc: BrunchMenuDoc): string {
 }
 
 async function loadRestaurantMenu(root: HTMLElement) {
-  const client = getClient()
+  const client = getSanityClient()
   if (!client) return
 
   const doc = await client.fetch<RestaurantMenuDoc | null>(
@@ -165,7 +142,7 @@ async function loadRestaurantMenu(root: HTMLElement) {
 }
 
 async function loadBrunchMenu(root: HTMLElement) {
-  const client = getClient()
+  const client = getSanityClient()
   if (!client) return
 
   const doc = await client.fetch<BrunchMenuDoc | null>(

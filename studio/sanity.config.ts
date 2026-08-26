@@ -15,7 +15,7 @@ if (!projectId) {
 
 export default defineConfig({
   name: 'cafe-erdmann',
-  title: 'Café Erdmann Speisekarte',
+  title: 'Café Erdmann',
   projectId: projectId || 'missingProjectId',
   dataset,
   plugins: [
@@ -24,6 +24,12 @@ export default defineConfig({
         S.list()
           .title('Inhalte')
           .items([
+            S.listItem()
+              .title('Öffnungszeiten')
+              .id('openingHours')
+              .child(
+                S.document().schemaType('openingHours').documentId('openingHours'),
+              ),
             S.listItem()
               .title('Restaurant-Speisekarte')
               .id('restaurantMenu')

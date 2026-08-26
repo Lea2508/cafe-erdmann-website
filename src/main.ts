@@ -1,6 +1,7 @@
 import './styles/global.css'
 import Lenis from 'lenis'
 import {initMenus} from './menu'
+import {initHours} from './hours'
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -260,6 +261,7 @@ function initMobileLoopSlideshow() {
 
 const lenis = initSmoothScroll()
 void initMenus()
+void initHours()
 initReveals()
 initAnchorScroll(lenis)
 initReserveToggle()

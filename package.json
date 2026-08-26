@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "studio": "npm --prefix studio run dev",
     "studio:deploy": "npm --prefix studio run deploy",
-    "studio:seed": "npm --prefix studio run seed"
+    "studio:seed": "npm --prefix studio run seed",
+    "studio:seed-hours": "npm --prefix studio run seed:hours"
   },
   "devDependencies": {
     "imagetracerjs": "^1.2.6",
